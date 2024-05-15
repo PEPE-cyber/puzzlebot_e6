@@ -9,8 +9,8 @@ from geometry_msgs.msg import Pose2D, Twist
 ra = .05
 b = 0.191 / 2
 
-MAX_ANGULAR_SPEED = 0.1
-MAX_LINEAR_SPEED = 2
+MAX_ANGULAR_SPEED = 0.3
+MAX_LINEAR_SPEED = 0.2
 
 class Navigation:
     def __init__(self):
@@ -41,20 +41,23 @@ class Navigation:
         self.currentPose.y = 0
         self.currentPose.theta = 0
         self.setpoint = Pose2D()
+        self.setpoint.x = 10
+        self.setpoint.y = 10
 
 
         self.rate = rospy.Rate(10)  # 10Hz
 
     def speeds_2_wheels(self, angular_vel, linear_vel):
-        mat = np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
+        # mat = np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
         # inv_mat = np.linalg.inv(mat)
         # input = np.array([linear_vel, angular_vel])
         # resultado = np.matmul(inv_mat, input)
         # print("linear: {}, angular: {}".format(linear_vel, angular_vel))
-        # msg = Twist()
-        # msg.linear.x = linear_vel
-        # msg.angular.z = angular_vel
-        # self.cmd_vel_pub.publish(msg)
+        msg = Twist()
+        msg.linear.x = linear_vel
+        msg.angular.z = angular_vel
+        rospy.loginfo(msg)
+        self.cmd_vel_pub.publish(msg)
     
     def wr_callback(self, msg):
         self.wr = msg.data
@@ -67,15 +70,15 @@ class Navigation:
 
     def run(self):
         dt = 0.1
+        matriz =np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
         while not rospy.is_shutdown():
             # Get the current pose
-            s_theta = sin(self.currentPose.theta)
-            c_theta = cos(self.currentPose.theta)
-            jacobiano = np.array([[ra*c_theta/2, ra*c_theta/2], [ra*s_theta/2, ra*s_theta/2], [ra/(2*b), -ra/(2*b)]])
-            [x_dot,y_dot,theta_dot] = np.matmul(jacobiano, np.array([self.wl, self.wr]))
+            [vel_lin, vel_ang]= np.matmul(matriz, np.array([self.wr, self.wl]))
+            y_dot =   sin(self.currentPose.theta) * vel_lin
+            x_dot =  cos(self.currentPose.theta) * vel_lin
             self.currentPose.x += x_dot * dt
             self.currentPose.y += y_dot * dt
-            self.currentPose.theta += theta_dot * dt
+            self.currentPose.theta += vel_ang * dt
             self.currentPose.theta = self.currentPose.theta % (2*np.pi)
             self.pose_pub.publish(self.currentPose)
             
@@ -88,14 +91,16 @@ class Navigation:
                 continue
             ang = atan2(error_y, error_x)
             error_theta = ang - self.currentPose.theta
-            angular_speed = error_theta * 0.2
-            linear_speed = error_distance * 2
+            angular_speed = error_theta * 0.1
+            linear_speed = error_distance * 0.1
             if linear_speed > MAX_LINEAR_SPEED:
                 linear_speed = MAX_LINEAR_SPEED
             elif linear_speed < -MAX_LINEAR_SPEED:
                 linear_speed = -MAX_LINEAR_SPEED
             if angular_speed > MAX_ANGULAR_SPEED:
                 angular_speed = MAX_ANGULAR_SPEED
+            elif angular_speed < -MAX_ANGULAR_SPEED:
+                angular_speed = -MAX_ANGULAR_SPEED
             self.speeds_2_wheels(angular_speed, linear_speed)
             
             # Sleep
