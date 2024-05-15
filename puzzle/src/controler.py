@@ -5,14 +5,14 @@ from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from math import atan2, sqrt
 
-MAX_ANGULAR_SPEED = 0.5
-MAX_LINEAR_SPEED = 0.2
+MAX_ANGULAR_SPEED = 0.3
+MAX_LINEAR_SPEED = 0.15
 
-class talker():
+class Controler():
     def __init__(self):
         rospy.Subscriber('/odom', Odometry, self.odom_callback)
         self.pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-        rospy.init_node('talker', anonymous=True)
+        rospy.init_node('Nav controler', anonymous=True)
         self.rate = rospy.Rate(10) # 10hz
         self.set_x = 10
         self.set_y = 10
@@ -55,7 +55,7 @@ class talker():
 
 if __name__ == '__main__':
     try:
-        node = talker()
+        node = Controler()
         node.run()
     except rospy.ROSInterruptException:
         pass

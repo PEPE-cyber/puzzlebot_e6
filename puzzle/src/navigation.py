@@ -9,8 +9,8 @@ from geometry_msgs.msg import Pose2D, Twist
 ra = .05
 b = 0.191 / 2
 
-MAX_ANGULAR_SPEED = 0.3
-MAX_LINEAR_SPEED = 0.2
+MAX_ANGULAR_SPEED = 0.2
+MAX_LINEAR_SPEED = 0.1
 
 class Navigation:
     def __init__(self):
@@ -41,8 +41,8 @@ class Navigation:
         self.currentPose.y = 0
         self.currentPose.theta = 0
         self.setpoint = Pose2D()
-        self.setpoint.x = 10
-        self.setpoint.y = 10
+        self.setpoint.x = 0
+        self.setpoint.y = 3
 
 
         self.rate = rospy.Rate(10)  # 10Hz
@@ -72,6 +72,7 @@ class Navigation:
         dt = 0.1
         matriz =np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
         while not rospy.is_shutdown():
+            
             # Get the current pose
             [vel_lin, vel_ang]= np.matmul(matriz, np.array([self.wr, self.wl]))
             y_dot =   sin(self.currentPose.theta) * vel_lin
@@ -91,8 +92,10 @@ class Navigation:
                 continue
             ang = atan2(error_y, error_x)
             error_theta = ang - self.currentPose.theta
-            angular_speed = error_theta * 0.1
+            angular_speed = error_theta * 0.2
             linear_speed = error_distance * 0.1
+
+            # Make sure it is not too fast
             if linear_speed > MAX_LINEAR_SPEED:
                 linear_speed = MAX_LINEAR_SPEED
             elif linear_speed < -MAX_LINEAR_SPEED:
@@ -101,6 +104,7 @@ class Navigation:
                 angular_speed = MAX_ANGULAR_SPEED
             elif angular_speed < -MAX_ANGULAR_SPEED:
                 angular_speed = -MAX_ANGULAR_SPEED
+            # send speed
             self.speeds_2_wheels(angular_speed, linear_speed)
             
             # Sleep
@@ -112,4 +116,6 @@ if __name__ == '__main__':
         nav = Navigation()
         nav.run()
     except rospy.ROSInterruptException:
+        pass
+    except KeyboardInterrupt:
         pass
