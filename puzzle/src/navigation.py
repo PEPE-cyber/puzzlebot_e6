@@ -10,7 +10,7 @@ ra = .05
 b = 0.191 / 2
 
 MAX_ANGULAR_SPEED = 0.1
-MAX_LINEAR_SPEED = 0.1
+MAX_LINEAR_SPEED = 2
 
 class Navigation:
     def __init__(self):
@@ -21,7 +21,7 @@ class Navigation:
         # self.wr_pub = rospy.Publisher('/cmd_wR', Float32, queue_size=10)  
 
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-        
+
         # Subscribers to update real wheel speeds
         rospy.Subscriber('/wr', Float32, self.wr_callback)
         rospy.Subscriber('/wl', Float32, self.wl_callback)
@@ -46,15 +46,15 @@ class Navigation:
         self.rate = rospy.Rate(10)  # 10Hz
 
     def speeds_2_wheels(self, angular_vel, linear_vel):
-        # mat = np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
+        mat = np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
         # inv_mat = np.linalg.inv(mat)
         # input = np.array([linear_vel, angular_vel])
         # resultado = np.matmul(inv_mat, input)
-        # print("Sending speeds: ", resultado)
-        msg = Twist()
-        msg.linear.x = linear_vel
-        msg.angular.z = angular_vel
-        self.cmd_vel_pub.publish(msg)
+        # print("linear: {}, angular: {}".format(linear_vel, angular_vel))
+        # msg = Twist()
+        # msg.linear.x = linear_vel
+        # msg.angular.z = angular_vel
+        # self.cmd_vel_pub.publish(msg)
     
     def wr_callback(self, msg):
         self.wr = msg.data
@@ -76,17 +76,20 @@ class Navigation:
             self.currentPose.x += x_dot * dt
             self.currentPose.y += y_dot * dt
             self.currentPose.theta += theta_dot * dt
-           
+            self.currentPose.theta = self.currentPose.theta % (2*np.pi)
             self.pose_pub.publish(self.currentPose)
             
             # Control
             error_y = self.setpoint.y - self.currentPose.y
             error_x =  self.setpoint.x - self.currentPose.x
+            error_distance = sqrt(error_x * error_x + error_y * error_y)
+            if (error_distance < 0.1):
+                self.speeds_2_wheels(0, 0)
+                continue
             ang = atan2(error_y, error_x)
-            error_distance = sqrt(error_x * error_x + error_y*error_y)
             error_theta = ang - self.currentPose.theta
             angular_speed = error_theta * 0.2
-            linear_speed = error_distance * 0.4
+            linear_speed = error_distance * 2
             if linear_speed > MAX_LINEAR_SPEED:
                 linear_speed = MAX_LINEAR_SPEED
             elif linear_speed < -MAX_LINEAR_SPEED:
