@@ -4,7 +4,7 @@ import rospy
 from std_msgs.msg import Float32
 import numpy as np
 from math import cos, sin, atan2, sqrt
-from geometry_msgs.msg import Pose2D
+from geometry_msgs.msg import Pose2D, Twist
 
 ra = .05
 b = 0.191 / 2
@@ -17,18 +17,11 @@ class Navigation:
         rospy.init_node('Navigation', anonymous=False)
         
         # Publishers to send wheel speeds
-        self.wl_pub = rospy.Publisher('/cmd_wL', Float32, queue_size=10)
-        self.wr_pub = rospy.Publisher('/cmd_wR', Float32, queue_size=10)  
-        # stop motors
-        print("Stopping motors")
-        msg = Float32()
-        msg.data = 0
-        self.wl_pub.publish(msg)
-        msg.data = 0
-        self.wr_pub.publish(msg)
-        # Wait a second
-        rospy.sleep(3)
+        # self.wl_pub = rospy.Publisher('/cmd_wL', Float32, queue_size=10)
+        # self.wr_pub = rospy.Publisher('/cmd_wR', Float32, queue_size=10)  
 
+        self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        
         # Subscribers to update real wheel speeds
         rospy.Subscriber('/wr', Float32, self.wr_callback)
         rospy.Subscriber('/wl', Float32, self.wl_callback)
@@ -53,16 +46,15 @@ class Navigation:
         self.rate = rospy.Rate(10)  # 10Hz
 
     def speeds_2_wheels(self, angular_vel, linear_vel):
-        mat = np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
-        inv_mat = np.linalg.inv(mat)
-        input = np.array([linear_vel, angular_vel])
-        resultado = np.matmul(inv_mat, input)
-        print("Sending speeds: ", resultado)
-        msg = Float32()
-        msg.data = resultado[1]
-        self.wl_pub.publish(msg)
-        msg.data = resultado[0] 
-        self.wr_pub.publish(msg)
+        # mat = np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
+        # inv_mat = np.linalg.inv(mat)
+        # input = np.array([linear_vel, angular_vel])
+        # resultado = np.matmul(inv_mat, input)
+        # print("Sending speeds: ", resultado)
+        msg = Twist()
+        msg.linear.x = linear_vel
+        msg.angular.z = angular_vel
+        self.cmd_vel_pub.publish(msg)
     
     def wr_callback(self, msg):
         self.wr = msg.data
