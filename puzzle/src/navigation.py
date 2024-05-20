@@ -6,7 +6,7 @@ import numpy as np
 from math import cos, sin, atan2, sqrt
 from geometry_msgs.msg import Pose2D, Twist
 
-ra = .05
+ra = .055
 b = 0.191 / 2
 
 MAX_ANGULAR_SPEED = 0.2
@@ -41,18 +41,13 @@ class Navigation:
         self.currentPose.y = 0
         self.currentPose.theta = 0
         self.setpoint = Pose2D()
-        self.setpoint.x = 0
-        self.setpoint.y = 3
+        self.setpoint.x = 1.8
+        self.setpoint.y = 0
 
 
         self.rate = rospy.Rate(10)  # 10Hz
 
     def speeds_2_wheels(self, angular_vel, linear_vel):
-        # mat = np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
-        # inv_mat = np.linalg.inv(mat)
-        # input = np.array([linear_vel, angular_vel])
-        # resultado = np.matmul(inv_mat, input)
-        # print("linear: {}, angular: {}".format(linear_vel, angular_vel))
         msg = Twist()
         msg.linear.x = linear_vel
         msg.angular.z = angular_vel
@@ -68,6 +63,11 @@ class Navigation:
     def setpoint_callback(self, msg):
         self.setpoint = msg
 
+    def stop(self):
+        self.speeds_2_wheels(0, 0)
+        print("Stopping motors")
+
+
     def run(self):
         dt = 0.1
         matriz =np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
@@ -80,34 +80,33 @@ class Navigation:
             self.currentPose.x += x_dot * dt
             self.currentPose.y += y_dot * dt
             self.currentPose.theta += vel_ang * dt
-            self.currentPose.theta = self.currentPose.theta % (2*np.pi)
+            self.currentPose.theta = self.currentPose.theta 
             self.pose_pub.publish(self.currentPose)
             
             # Control
             error_y = self.setpoint.y - self.currentPose.y
             error_x =  self.setpoint.x - self.currentPose.x
             error_distance = sqrt(error_x * error_x + error_y * error_y)
-            if (error_distance < 0.1):
-                self.speeds_2_wheels(0, 0)
-                continue
-            ang = atan2(error_y, error_x)
-            error_theta = ang - self.currentPose.theta
-            angular_speed = error_theta * 0.2
-            linear_speed = error_distance * 0.1
+            if (error_distance < 0.01):
+                self.stop()
+            else:
+                ang = atan2(error_y, error_x)
+                error_theta = ang - self.currentPose.theta
+                angular_speed = error_theta * 0.13
+                linear_speed = error_distance * 0.23
 
-            # Make sure it is not too fast
-            if linear_speed > MAX_LINEAR_SPEED:
-                linear_speed = MAX_LINEAR_SPEED
-            elif linear_speed < -MAX_LINEAR_SPEED:
-                linear_speed = -MAX_LINEAR_SPEED
-            if angular_speed > MAX_ANGULAR_SPEED:
-                angular_speed = MAX_ANGULAR_SPEED
-            elif angular_speed < -MAX_ANGULAR_SPEED:
-                angular_speed = -MAX_ANGULAR_SPEED
-            # send speed
-            self.speeds_2_wheels(angular_speed, linear_speed)
-            
-            # Sleep
+                # Make sure it is not too fast
+                if linear_speed > MAX_LINEAR_SPEED:
+                    linear_speed = MAX_LINEAR_SPEED
+                elif linear_speed < -MAX_LINEAR_SPEED:
+                    linear_speed = -MAX_LINEAR_SPEED
+                if angular_speed > MAX_ANGULAR_SPEED:
+                    angular_speed = MAX_ANGULAR_SPEED
+                elif angular_speed < -MAX_ANGULAR_SPEED:
+                    angular_speed = -MAX_ANGULAR_SPEED
+                # send speed
+                self.speeds_2_wheels(angular_speed, linear_speed)
+                # Sleep
             self.rate.sleep()
             
 
@@ -116,6 +115,6 @@ if __name__ == '__main__':
         nav = Navigation()
         nav.run()
     except rospy.ROSInterruptException:
-        pass
+        nav.stop()
     except KeyboardInterrupt:
-        pass
+        nav.stop()
