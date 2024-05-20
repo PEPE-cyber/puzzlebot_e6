@@ -7,10 +7,10 @@ from math import cos, sin, atan2, sqrt
 from geometry_msgs.msg import Pose2D, Twist
 
 ra = .055
-b = 0.191 / 2
+b = 0.1725 / 2
 
-MAX_ANGULAR_SPEED = 0.2
-MAX_LINEAR_SPEED = 0.1
+MAX_ANGULAR_SPEED = 0.1
+MAX_LINEAR_SPEED = 0.2
 
 class Navigation:
     def __init__(self):
@@ -42,7 +42,7 @@ class Navigation:
         self.currentPose.theta = 0
         self.setpoint = Pose2D()
         self.setpoint.x = 1.8
-        self.setpoint.y = 0
+        self.setpoint.y = -0.6
 
 
         self.rate = rospy.Rate(10)  # 10Hz
@@ -93,7 +93,7 @@ class Navigation:
                 ang = atan2(error_y, error_x)
                 error_theta = ang - self.currentPose.theta
                 angular_speed = error_theta * 0.13
-                linear_speed = error_distance * 0.23
+                linear_speed = error_distance * 0.15
 
                 # Make sure it is not too fast
                 if linear_speed > MAX_LINEAR_SPEED:

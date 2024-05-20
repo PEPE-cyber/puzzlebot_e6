@@ -69,6 +69,7 @@ class LiDAR():
 
       
     def run(self):
+        with
         while not rospy.is_shutdown():
             for scan in self.lidar.iter_measures():
                 [new_scan, quality, angle, distance] = scan
