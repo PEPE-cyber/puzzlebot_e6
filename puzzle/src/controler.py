@@ -1,63 +1,101 @@
 #!/usr/bin/env python
 
 import rospy
-from geometry_msgs.msg import Twist
-from nav_msgs.msg import Odometry
-from math import atan2, sqrt
+from std_msgs.msg import Bool
+import numpy as np
+from math import cos, sin, atan2, sqrt
+from geometry_msgs.msg import Pose2D, Twist
 
-MAX_ANGULAR_SPEED = 0.3
-MAX_LINEAR_SPEED = 0.15
+ra = .055
+b = 0.1725 / 2
 
-class Controler():
+MAX_ANGULAR_SPEED = 0.1
+MAX_LINEAR_SPEED = 0.2
+
+class Controler:
     def __init__(self):
-        rospy.Subscriber('/odom', Odometry, self.odom_callback)
-        self.pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-        rospy.init_node('Nav controler', anonymous=True)
-        self.rate = rospy.Rate(10) # 10hz
-        self.set_x = 10
-        self.set_y = 10
-        self.x = 0
-        self.y = 0
+        rospy.init_node('Controller', anonymous=False)
+        
 
-        vel_msg = Twist()
-        vel_msg.linear.x =  0
-        vel_msg.angular.z = 0
-        rospy.loginfo(vel_msg)
-        self.pub.publish(vel_msg)
+        self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
-    def odom_callback(self, msg):
-        self.x = msg.pose.pose.position.x
-        self.y = msg.pose.pose.position.y
-        self.th = msg.pose.pose.orientation.z
+        # Subscribers to send update
+        self.pose_sub = rospy.Subscriber('/pose', Pose2D, self.setpoint_callback)
+
+        # Subscribers to update setpoint
+        self.setpoint_sub = rospy.Subscriber('/setpoint', Pose2D, self.setpoint_callback)
+        
+        # Subscribers to u
+        self.setpoint_sub = rospy.Subscriber('/controllerActive', Bool, self.active_callback)
+
+        self.currentPose = Pose2D()
+        self.setpoint = Pose2D()
+        self.setpoint.x = 0
+        self.setpoint.y = 0
+        self.setpoint.theta = 0
+        
+        self.active = True
+
+
+        self.rate = rospy.Rate(10)  # 10Hz
+
+    def speeds_2_wheels(self, angular_vel, linear_vel):
+        msg = Twist()
+        msg.linear.x = linear_vel
+        msg.angular.z = angular_vel
+        rospy.loginfo(msg)
+        self.cmd_vel_pub.publish(msg)
+
+
+    def setpoint_callback(self, msg):
+        self.setpoint = msg
+
+    def pose_callback(self, msg):
+        self.currentPose = msg
+
+    def active_callback(self, msg):
+        self.active = msg.data
+
+    def stop(self):
+        self.speeds_2_wheels(0, 0)
+        print("Stopping motors")
 
 
     def run(self):
         while not rospy.is_shutdown():
-            ey = self.set_y - self.y
-            ex = self.set_x - self.x
-            ang = atan2(ey, ex)
-            ed = sqrt(ex * ex + ey*ey)
-            eth = ang - self.th
-            vel_msg = Twist()
-            vel_msg.linear.x =  ed * 0.1
-            vel_msg.angular.z = eth * 0.1 # Change this value to what you want
-            if vel_msg.linear.x > MAX_LINEAR_SPEED:
-                vel_msg.linear.x = MAX_LINEAR_SPEED
-            elif vel_msg.linear.x < -MAX_LINEAR_SPEED:
-                vel_msg.linear.x = -MAX_LINEAR_SPEED
-            if (vel_msg.angular.z > MAX_ANGULAR_SPEED):
-                vel_msg.angular.z = MAX_ANGULAR_SPEED
-            elif (vel_msg.angular.z < -MAX_ANGULAR_SPEED):
-                vel_msg.angular.z = -MAX_ANGULAR_SPEED
-            rospy.loginfo(vel_msg)
-            self.pub.publish(vel_msg)
+            if self.active:
+                # Control
+                error_y = self.setpoint.y - self.currentPose.y
+                error_x =  self.setpoint.x - self.currentPose.x
+                error_distance = sqrt(error_x * error_x + error_y * error_y)
+                if (error_distance < 0.01):
+                    self.stop()
+                else:
+                    ang = atan2(error_y, error_x)
+                    error_theta = ang - self.currentPose.theta
+                    angular_speed = error_theta * 0.13
+                    linear_speed = error_distance * 0.15
+
+                    # Make sure it is not too fast
+                    if linear_speed > MAX_LINEAR_SPEED:
+                        linear_speed = MAX_LINEAR_SPEED
+                    elif linear_speed < -MAX_LINEAR_SPEED:
+                        linear_speed = -MAX_LINEAR_SPEED
+                    if angular_speed > MAX_ANGULAR_SPEED:
+                        angular_speed = MAX_ANGULAR_SPEED
+                    elif angular_speed < -MAX_ANGULAR_SPEED:
+                        angular_speed = -MAX_ANGULAR_SPEED
+                    # send speed
+                    self.speeds_2_wheels(angular_speed, linear_speed)
+            # Sleep
             self.rate.sleep()
+            
 
 if __name__ == '__main__':
     try:
-        node = Controler()
-        node.run()
+        nav = Controler()
+        nav.run()
     except rospy.ROSInterruptException:
-        pass
+        nav.stop()
     except KeyboardInterrupt:
-        pass
+        nav.stop()
