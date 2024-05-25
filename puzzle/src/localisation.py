@@ -5,12 +5,15 @@ from std_msgs.msg import Float32
 import numpy as np
 from math import cos, sin, atan2, sqrt
 from geometry_msgs.msg import Pose2D, Twist
+from kalman import EKF
 
-ra = .055
-b = 0.1725 / 2
+wheelR = .055
+l = 0.1725 / 2
 
 MAX_ANGULAR_SPEED = 0.1
 MAX_LINEAR_SPEED = 0.2
+
+
 
 class Localisation:
     def __init__(self):
@@ -30,10 +33,7 @@ class Localisation:
         self.wl = 0
         self.wr = 0
 
-        self.currentPose = Pose2D()
-        self.currentPose.x = 0
-        self.currentPose.y = 0
-        self.currentPose.theta = 0
+        self.ekf = EKF()
 
         self.rate = rospy.Rate(10)  # 10Hz
 
@@ -47,19 +47,15 @@ class Localisation:
 
     def run(self):
         dt = 0.1
-        matriz =np.array([[ra/2, ra/2], [ra/(2*b), -ra/(2*b)]])
+        matriz =np.array([[wheelR/2, wheelR/2], [wheelR/(2*l), -wheelR/(2*l)]])
         while not rospy.is_shutdown():
             
             # Get the current pose
-            [vel_lin, vel_ang]= np.matmul(matriz, np.array([self.wr, self.wl]))
-            y_dot =   sin(self.currentPose.theta) * vel_lin
-            x_dot =  cos(self.currentPose.theta) * vel_lin
-            self.currentPose.x += x_dot * dt
-            self.currentPose.y += y_dot * dt
-            self.currentPose.theta += vel_ang * dt
-            self.currentPose.theta = self.currentPose.theta 
-            self.pose_pub.publish(self.currentPose)
-            self.rate.sleep()
+            u = np.matmul(matriz, np.array([self.wr, self.wl]))
+            est_state = self.ekf.stateTrasitionModel(u)
+            self.ekf.jacobian(u)
+
+            
             
 
 if __name__ == '__main__':
