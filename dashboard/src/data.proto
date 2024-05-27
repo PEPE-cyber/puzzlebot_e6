@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+// input image, width, height
+message Image {
+    bytes data = 1;
+    int32 width = 2;
+    int32 height = 3;
+}
+
+message Vels {
+    float v_l = 4;
+    float v_r = 5;
+}
+
+message Data {
+    Vels v = 10;
+    Image img = 11;
+}
+
+message Res {
+    bool success = 21;
+}
+
+
+// service
+service MyService {
+    rpc sendData(Data) returns (Res) {}
+}

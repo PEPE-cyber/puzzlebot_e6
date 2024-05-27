@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import rospy
-from rplidar import RPLidar
+from rplidar import RPLidar, RPLidarException
 from geometry_msgs.msg import Pose2D
 from math import sin, cos, pi
 import cv2 as cv
 import numpy as np
 import zlib
+import time
 
 import grpc
 
@@ -34,9 +35,10 @@ class PointCloud:
         self.height = height
         self.cloudData = np.ones([height, width], dtype=np.uint8) * 255
         self.pose = Pose2D()
-        self.lidar = RPLidar('/dev/ttyUSBLiDAR')
+        self.lidar = RPLidar('/dev/ttyUSBLiDAR', baudrate=115200)
         rospy.init_node('PointCloud', anonymous=False)
-        rospy.subscriber('/pose', Pose2D, self.pose_callback)
+        rospy.Subscriber('/pose', Pose2D, self.pose_callback)
+        
 
 
     def pose_callback(self, msg):
@@ -44,7 +46,6 @@ class PointCloud:
 
     def clean(self):
         self.cloudData = self.cloudData * 0 + 255
-        self.borderLines.clear()
        
 
     def addPoint(self, coord, size=1):
@@ -60,11 +61,11 @@ class PointCloud:
                     if abs(relativeY + i) < self.height and abs(relativeX + j) < self.width and relativeY + i >= 0 and relativeX + j >= 0:
                         self.cloudData[relativeY + i][relativeX + j] = 0
 
-    def addLidarMeasure(self, angle, distance, pose):
-        absAngle = angle + pose.theta - 90
+    def addLidarMeasure(self, angle, distance):
+        absAngle = angle + self.pose.theta - 90
         # make the center of the image as the origin
-        x = int(distance * cos(absAngle * pi / 180) + pose.x)
-        y = int(distance * sin(absAngle * pi / 180) + pose.y)
+        x = int(distance * cos(absAngle * pi / 180) + self.pose.x)
+        y = int(distance * sin(absAngle * pi / 180) + self.pose.y)
         if abs(x) < self.width and abs(y) < self.height // 2:
             # determine the size of the point based on the distance
             size = int(distance * 0.1) + 2
@@ -83,18 +84,35 @@ class PointCloud:
         response = stub.getLocation(request)
 
     def run(self):
-        for scan in self.lidar.iter_scans():
-            angles = []
-            distances = []
-            for (_, angle, distance) in scan:
-                angles.append(angle)
-                distances.append(distance)
-                self.addLidarMeasure(angle, distance)
-            self.sendTofindBorders(angles, distances)
+        iterator = self.lidar.iter_scans()
+        rate = rospy.Rate(10)
+        while True:
+            try:
+                for scan in iterator:
+                    start_time = time.time()
+                    angles = []
+                    distances = []
+                
+                    for (_, angle, distance) in scan:
+                        angles.append(angle)
+                        distances.append(distance)
+                        self.addLidarMeasure(angle, distance)
+                    self.sendTofindBorders(angles, distances)
+                    self.clean()
+                    print(time.time() - start_time)
+                    
+            except RPLidarException as e:
+                print("error")
+                self.lidar.clean_input()
+                pass
+            except:
+                print("hola")
+                self.lidar.clean_input()
+            rate.sleep()
 
 
 if __name__ == '__main__':
-    node = PointCloud()
+    node = PointCloud(600,600)
     try:
         node.run()
     except rospy.ROSInterruptException:
