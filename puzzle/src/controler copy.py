@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import rospy
-from std_msgs.msg import Bool, Float64, String
+from std_msgs.msg import Bool, Float64
 import numpy as np
 from math import cos, sin, atan2, sqrt
 from geometry_msgs.msg import Pose2D, Twist
@@ -19,16 +19,16 @@ class Controler:
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
 
         # Subscribers to send update
-        self.pose_sub = rospy.Subscriber('/pose', Pose2D, self.pose_callback)
+        self.pose_sub = rospy.Subscriber('/pose', Pose2D, self.setpoint_callback)
 
         # Subscribers to update setpoint
         self.setpoint_sub = rospy.Subscriber('/setpoint', Pose2D, self.setpoint_callback)
     
 
         # Subscriber to get the current pose of arUco
-        rospy.Subscriber('/marker_x', Float64, self.x_callback)
-        rospy.Subscriber('/marker_z', Float64, self.z_callback)
-        rospy.Subscriber('/controller_mode', String, self.mode_callback)
+        self.pose_x = rospy.Subscriber('/marker_x', Float64, self.x_callback)
+        self.pose_z = rospy.Subscriber('/marker_z', Float64, self.z_callback)
+        self.found_sub = rospy.Subscriber('/found', Bool, self.found_callback)
 
 
         self.currentPose = Pose2D()
@@ -37,7 +37,7 @@ class Controler:
         self.setpoint.y = 0
         self.setpoint.theta = 0
         
-        self.mode = ""
+        self.found = False
 
 
         self.rate = rospy.Rate(10)  # 10Hz
@@ -65,14 +65,14 @@ class Controler:
     def x_callback(self, msg):
         self.x = msg.data
 
-    def mode_callback(self, msg):
-        self.mode = msg.data
+    def found_callback(self, msg):
+        self.found = msg.data
 
 
     def run(self):
         while not rospy.is_shutdown():
-            if self.mode == "Coords":
-                 # Control
+            if self.found == False:
+                """ # Control
                 error_y = self.setpoint.y - self.currentPose.y
                 error_x =  self.setpoint.x - self.currentPose.x
                 error_distance = sqrt(error_x * error_x + error_y * error_y)
@@ -94,13 +94,13 @@ class Controler:
                     elif angular_speed < -MAX_ANGULAR_SPEED:
                         angular_speed = -MAX_ANGULAR_SPEED
                     # send speed
-                    self.speeds_2_wheels(angular_speed, linear_speed) 
-            elif  self.mode == "Off":
-                pass
-            elif self.mode == "Aruco":
+                    self.speeds_2_wheels(angular_speed, linear_speed) """
+                self.speeds_2_wheels(.5, 0)
+                print("Buscando")
+            else :
                 #Tenemos la posicion del Aruco
-                diff_x = -.2 * self.x
-                diff_z = .2 * self.z
+                diff_x = -20 * self.x
+                diff_z = 2 * self.z
                 # Giramos hasta que tenga el cubo en el centro
                 if abs(diff_x) < 0.02:
                     self.speeds_2_wheels(0, diff_z)
@@ -108,11 +108,6 @@ class Controler:
                 else:
                     self.speeds_2_wheels(diff_x, 0)
                     print("Vuelta")
-            elif self.mode == 'Turning':
-                self.speeds_2_wheels(0.1, 0)
-
-            print(self.mode)
-
             # Sleep
             self.rate.sleep()
             
