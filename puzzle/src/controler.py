@@ -78,6 +78,7 @@ class Controler:
                 error_distance = sqrt(error_x * error_x + error_y * error_y)
                 if (error_distance < 0.01):
                     self.stop()
+                    #! Cambio la flag a True
                 else:
                     ang = atan2(error_y, error_x)
                     error_theta = ang - self.currentPose.theta

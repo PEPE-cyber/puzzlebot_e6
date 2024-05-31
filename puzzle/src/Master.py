@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
+#! La flag que cambia el controlador comienza la sequencia de buscar el aruco donde lo vamos a dejar
+#! y a dejar el aruco y detenerse
 import rospy
 import numpy as np
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, String, Float32
 from math import cos, sin, atan2, sqrt
 from geometry_msgs.msg import Twist, Pose2D
 
@@ -19,6 +21,8 @@ class Master:
         self.controllermode_pub = rospy.Publisher('/controller_mode', String, queue_size=10)
         self.setpoint_pub = rospy.Publisher('/setpoint', Pose2D, queue_size=10)
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.servo_pub = rospy.Publisher('/ServoAngle', Float32, queue_size=10)
+        self.aruco_pub = rospy.Publisher('/idAruco', int, queue_size=10)
 
         # Subscribers
         rospy.Subscriber('/found', Bool, self.found_callback)
@@ -27,6 +31,7 @@ class Master:
 
         self.state = 'Turning'
         self.found = False
+        self.aruco = 1
         print("Start")
 
     def found_callback(self, msg):
@@ -38,7 +43,6 @@ class Master:
         print("Stopping motors")
         self.cmd_vel_pub.publish(self.vel)
 
-
     def run(self):
         while not rospy.is_shutdown():
 	        #Creamos el msj String()
@@ -48,10 +52,11 @@ class Master:
                 mode.data = 'Coords'
                 self.controllermode_pub.publish(mode)
                 pose = Pose2D()
-                pose.x = 2
+                pose.x = 1
                 pose.y = 1
                 pose.theta = 0
                 self.setpoint_pub.publish(pose)
+                self.aruco = 2
             elif self.state == 'Aruco':
                 mode.data = 'Aruco'
                 self.controllermode_pub.publish(mode)
@@ -59,14 +64,15 @@ class Master:
                     self.state = 'Take arUco'
                 # Si no es True me quedo en el mismo estado
                 # ya que lo sigo viendo
-            elif self.state == 'Turning':
+            elif self.state == 'Turning': # aqui nomas giro
                 mode.data = 'Turning'
                 self.controllermode_pub.publish(mode)
+                self.aruco_pub.publish(self.aruco)
                 if self.found == True:
                     self.state = 'Aruco'
                 # Si no es False me quedo en el mismo estado
             elif self.state == 'Take arUco':
-                # Apago el ocntrolador
+                # Apago el controlador
                 mode.data = 'Off'
                 self.controllermode_pub.publish(mode)
                 # Me acerco al arUco
@@ -92,13 +98,9 @@ class Master:
                 vel.angular.z = 0
                 print("Stopping motors")
                 self.cmd_vel_pub.publish(vel)
-
-
             print(self.state)
             # Sleep
             self.rate.sleep()
-
-            
 
 if __name__ == '__main__':
     try:

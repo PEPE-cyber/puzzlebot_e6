@@ -21,6 +21,9 @@ class ArucoDetector:
         rospy.init_node('ArucoDetector', anonymous=False)
         self.poseMode = True
         rospy.Subscriber('/ArucoDetectorPoseMode', Bool, self.poseModeCb)
+        rospy.Subscriber('/idAruco', int, self.arucoid)
+
+        self.marker_id_pub = rospy.Publisher('/marker_id', int, queue_size = 10)
         self.marker_x_pub = rospy.Publisher('/marker_x', Float64, queue_size = 10)
         self.marker_z_pub = rospy.Publisher('/marker_z', Float64, queue_size = 10)
         self.found_pub = rospy.Publisher('/found', Bool, queue_size = 10)
@@ -29,6 +32,8 @@ class ArucoDetector:
     def poseModeCb(self, msg):
         self.poseMode = msg.data
 
+    def arucoid(self, msg):
+        self.search = msg.data
 
     def run(self):
         rate = rospy.Rate(fps)
@@ -50,19 +55,25 @@ class ArucoDetector:
                 # Print the marker ID, rotation vector, and translation vector
                 detectedArUcos = []
                 for i in range(len(ids)):
-                    detectedArUcos.append({
-                        'id': ids[i][0],
-                        'x': tvec[i][0][0], 
-                        'z': tvec[i][0][2]})
+                    if ids[i][0] == self.search:
+                        detectedArUcos.append({
+                            'id': ids[i][0],
+                            'x': tvec[i][0][0], 
+                            'z': tvec[i][0][2]})
+                        msg.data = True
+                
+                if detectedArUcos :
+                    self.marker_id_pub.publish(detectedArUcos[0]['id'])
+                    self.marker_x_pub.publish(detectedArUcos[0]['x'])
+                    self.marker_z_pub.publish(detectedArUcos[0]['z'])
 
-                self.marker_x_pub.publish(detectedArUcos[0]['x'])
-                self.marker_z_pub.publish(detectedArUcos[0]['z'])
-
-                msg.data = True
+                
                 self.found_pub.publish(msg)
-                print(f"Marker ID: {detectedArUcos[0]['id']}")
-                print(f"X: {detectedArUcos[0]['x']}")
-                print(f"Z: {detectedArUcos[0]['z']}")
+                msg.data = False
+                if detectedArUcos :
+                    print(f"Marker ID: {detectedArUcos[0]['id']}")
+                    print(f"X: {detectedArUcos[0]['x']}")
+                    print(f"Z: {detectedArUcos[0]['z']}")
             else:
                 print('No markers detected')
 
