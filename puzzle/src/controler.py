@@ -4,9 +4,9 @@ from std_msgs.msg import Bool, Float64, String
 import numpy as np
 from math import cos, sin, atan2, sqrt
 from geometry_msgs.msg import Pose2D, Twist
+from puzzle.msg import Obstacles
 
-ra = .055
-b = 0.1725 / 2
+
 
 MAX_ANGULAR_SPEED = 0.1
 MAX_LINEAR_SPEED = 0.2
@@ -17,27 +17,30 @@ class Controler:
         
 
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.cotroller_done_pub = rospy.Publisher('/controller_done', Bool, queue_size=10)
 
         # Subscribers to send update
-        self.pose_sub = rospy.Subscriber('/pose', Pose2D, self.pose_callback)
-
+        rospy.Subscriber('/pose', Pose2D, self.pose_callback)
         # Subscribers to update setpoint
-        self.setpoint_sub = rospy.Subscriber('/setpoint', Pose2D, self.setpoint_callback)
-    
+        rospy.Subscriber('/setpoint', Pose2D, self.setpoint_callback)
 
         # Subscriber to get the current pose of arUco
         rospy.Subscriber('/marker_x', Float64, self.x_callback)
         rospy.Subscriber('/marker_z', Float64, self.z_callback)
         rospy.Subscriber('/controller_mode', String, self.mode_callback)
+        rospy.Subscriber('/obstacle', Obstacles, self.obstacle_callback)
+        
 
 
         self.currentPose = Pose2D()
         self.setpoint = Pose2D()
+        self.obstacles = Obstacles()
         self.setpoint.x = 0
         self.setpoint.y = 0
         self.setpoint.theta = 0
         
         self.mode = ""
+        self.done = False
 
 
         self.rate = rospy.Rate(10)  # 10Hz
@@ -66,7 +69,16 @@ class Controler:
         self.x = msg.data
 
     def mode_callback(self, msg):
+        self.done = False
         self.mode = msg.data
+
+    def obstacle_callback(self, msg):
+        self.obstacles = msg
+
+    def publish_done(self, value):
+        if value != self.done:
+            self.cotroller_done_pub.publish(value)
+            self.done = value
 
 
     def run(self):
@@ -78,8 +90,9 @@ class Controler:
                 error_distance = sqrt(error_x * error_x + error_y * error_y)
                 if (error_distance < 0.01):
                     self.stop()
-                    #! Cambio la flag a True
+                    self.publish_done(True)
                 else:
+                    # TODO: ADD BUG0 ALGORITHM
                     ang = atan2(error_y, error_x)
                     error_theta = ang - self.currentPose.theta
                     angular_speed = error_theta * 0.13
@@ -102,13 +115,17 @@ class Controler:
                 #Tenemos la posicion del Aruco
                 diff_x = -.2 * self.x
                 diff_z = .2 * self.z
-                # Giramos hasta que tenga el cubo en el centro
-                if abs(diff_x) < 0.02:
-                    self.speeds_2_wheels(0, diff_z)
-                    print("Avanzando")
+                if abs(diff_x) < 0.02 and abs(diff_z) < 0.15:
+                    self.publish_done(True)
                 else:
-                    self.speeds_2_wheels(diff_x, 0)
-                    print("Vuelta")
+                    # Giramos hasta que tenga el cubo en el centro
+                    if abs(diff_x) < 0.02:
+                        self.speeds_2_wheels(0, diff_z)
+                        print("Avanzando")
+                    else:
+                        self.speeds_2_wheels(diff_x, 0)
+                        print("Vuelta")
+
             elif self.mode == 'Turning':
                 self.speeds_2_wheels(0.1, 0)
 

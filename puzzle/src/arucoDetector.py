@@ -4,7 +4,7 @@ import numpy as np
 import nanocamera as nano
 from cv2 import aruco
 import rospy
-from std_msgs.msg import Bool, Float64
+from std_msgs.msg import Bool, Float64, Int16
 
 fps = 120
 
@@ -21,12 +21,13 @@ class ArucoDetector:
         rospy.init_node('ArucoDetector', anonymous=False)
         self.poseMode = True
         rospy.Subscriber('/ArucoDetectorPoseMode', Bool, self.poseModeCb)
-        rospy.Subscriber('/idAruco', int, self.arucoid)
+        rospy.Subscriber('/idAruco', Int16, self.arucoid)
 
-        self.marker_id_pub = rospy.Publisher('/marker_id', int, queue_size = 10)
+        self.marker_id_pub = rospy.Publisher('/marker_id', Int16, queue_size = 10)
         self.marker_x_pub = rospy.Publisher('/marker_x', Float64, queue_size = 10)
         self.marker_z_pub = rospy.Publisher('/marker_z', Float64, queue_size = 10)
         self.found_pub = rospy.Publisher('/found', Bool, queue_size = 10)
+        self.search = 1
 
 
     def poseModeCb(self, msg):
@@ -69,11 +70,13 @@ class ArucoDetector:
 
                 
                 self.found_pub.publish(msg)
+                print(f"State : {msg.data}")
                 msg.data = False
                 if detectedArUcos :
-                    print(f"Marker ID: {detectedArUcos[0]['id']}")
-                    print(f"X: {detectedArUcos[0]['x']}")
-                    print(f"Z: {detectedArUcos[0]['z']}")
+                    pass
+                    # print(f"Marker ID: {detectedArUcos[0]['id']}")
+                    # print(f"X: {detectedArUcos[0]['x']}")
+                    # print(f"Z: {detectedArUcos[0]['z']}")
             else:
                 print('No markers detected')
 
@@ -82,7 +85,7 @@ class ArucoDetector:
             # show frame
             # print("yyeyyey")
             # cv2.imshow('frame', frame)
-            print(f"State: {msg.data}")
+            print(f"State ??: {msg.data}")
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
             rate.sleep()
