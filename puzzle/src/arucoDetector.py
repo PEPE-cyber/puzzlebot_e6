@@ -59,12 +59,11 @@ class ArucoDetector:
                     if ids[i][0] == self.search:
                         detectedArUcos.append({
                             'id': ids[i][0],
-                            'x': tvec[i][0][0], 
+                            'x':  sum([coord[0] for coord in corners[i][0]]) / len( corners[i][0] ) - 670,
                             'z': tvec[i][0][2]})
                         msg.data = True
                 
                 if detectedArUcos :
-                    self.marker_id_pub.publish(detectedArUcos[0]['id'])
                     self.marker_x_pub.publish(detectedArUcos[0]['x'])
                     self.marker_z_pub.publish(detectedArUcos[0]['z'])
 
@@ -73,10 +72,9 @@ class ArucoDetector:
                 print(f"State : {msg.data}")
                 msg.data = False
                 if detectedArUcos :
-                    pass
-                    # print(f"Marker ID: {detectedArUcos[0]['id']}")
-                    # print(f"X: {detectedArUcos[0]['x']}")
-                    # print(f"Z: {detectedArUcos[0]['z']}")
+                    print(f"Marker ID: {detectedArUcos[0]['id']}")
+                    print(f"X: {detectedArUcos[0]['x']}")
+                    print(f"Z: {detectedArUcos[0]['z']}")
             else:
                 print('No markers detected')
 
@@ -85,7 +83,6 @@ class ArucoDetector:
             # show frame
             # print("yyeyyey")
             # cv2.imshow('frame', frame)
-            print(f"State ??: {msg.data}")
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
             rate.sleep()

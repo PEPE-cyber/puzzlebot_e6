@@ -441,33 +441,37 @@ def getScans(min_len):
         'ranges': [],
     }
     i = 0
-    for scan in lidar.iter_scans():
-        front_close_points = 0
-        left_close_points = 0
-        right_close_points = 0
-        for _,angle,distance in scan:
-            scanBuffer['angles'].append(angle - 180)
-            scanBuffer['ranges'].append(distance / 10)
-            if angle > 70 and angle < 110:
-                if distance < 200:
-                    right_close_points += 1
-            elif angle > 340 or angle < 20:
-                if distance < 200:
-                    front_close_points += 1
-            elif angle > 250 and angle < 290:
-                if distance < 200:
-                    left_close_points += 1
-                
-            i += 1
-        if i > min_len:
-            yield scanBuffer
-            scanBuffer['angles'].clear()
-            scanBuffer['ranges'].clear()
-            i = 0
-        print("Front:", front_close_points)
-        print("Left:", left_close_points)
-        print("Right:", right_close_points)
-        send_obstacles(left_close_points > 5, right_close_points > 5, front_close_points > 5)    
+    min_distance = 4000
+    while True:
+        try:
+           for scan in lidar.iter_scans():
+                front_close_points = 0
+                left_close_points = 0
+                right_close_points = 0
+                for _,angle,distance in scan:
+                    scanBuffer['angles'].append(angle - 180)
+                    scanBuffer['ranges'].append(distance / 10)
+                    if angle > 70 and angle < 110:
+                        if distance < 350:
+                            right_close_points += 1
+                    elif angle > 350 or angle < 20:
+                        if distance < 350:
+                            front_close_points += 1
+                    elif angle > 250 and angle < 290:
+                        if distance < 350:
+                            left_close_points += 1
+                    i += 1
+                if i > min_len:
+                    yield scanBuffer
+                    scanBuffer['angles'].clear()
+                    scanBuffer['ranges'].clear()
+                    i = 0
+                print("Front:", front_close_points)
+                print("Left:", left_close_points)
+                print("Right:", right_close_points)
+                send_obstacles(left_close_points > 3, right_close_points > 3, front_close_points > 3)  
+        except RPLidarException:
+            lidar.clean_input()  
 
 
 if __name__ == '__main__':
@@ -475,9 +479,10 @@ if __name__ == '__main__':
     pub = rospy.Publisher('/obstacle', Obstacles, queue_size=10)
     for i, scan in enumerate(getScans(100)):
         try:
-            borderLines = get_borders(scan['angles'], scan['ranges'], 0, 0)
-            # print(borderLines)
-            x,y,theta = estimatePosition(borderLines)
+            # borderLines = get_borders(scan['angles'], scan['ranges'], 0, 0)
+            # # print(borderLines)
+            # x,y,theta = estimatePosition(borderLines)
+            print("ok")
         except RPLidarException:
             lidar.stop()
         except KeyboardInterrupt:

@@ -4,9 +4,10 @@
 #! y a dejar el aruco y detenerse
 import rospy
 import numpy as np
-from std_msgs.msg import Bool, String, Float32
+from std_msgs.msg import Bool, String, Float32, Int16
 from math import cos, sin, atan2, sqrt
 from geometry_msgs.msg import Twist, Pose2D
+from time import sleep
 
 #Manda el sp
 
@@ -23,20 +24,23 @@ class Master:
         self.controllermode_pub = rospy.Publisher('/controller_mode', String, queue_size=10)
         self.setpoint_pub = rospy.Publisher('/setpoint', Pose2D, queue_size=10)
         self.cmd_vel_pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
-        self.servo_pub = rospy.Publisher('/ServoAngle', Float32, queue_size=10)
-        self.aruco_pub = rospy.Publisher('/idAruco', int, queue_size=10)
+        self.servo_pub = rospy.Publisher('/servo', Float32, queue_size=10)
+        self.aruco_pub = rospy.Publisher('/idAruco', Int16, queue_size=10)
 
         # Subscribers
         rospy.Subscriber('/found', Bool, self.found_callback)
-        rospy.Subscriber('/controller_done', Bool, self.phase_callback)
+        rospy.Subscriber('/controller_done', Bool, self.controller_callback)
         
         self.rate = rospy.Rate(10)  # 10Hz
 
-        self.state = 'Turning'
+        self.state = 'going_box'
         self.found = False
         self.phase = False
         self.controller_mode = String()
+        self.controller_mode.data = "None"
         print("Start")
+        sleep(1)
+        self.servo_pub.publish(80) 
 
     def phase_callback(self, msg):
         self.phase = msg.data
@@ -62,9 +66,10 @@ class Master:
         
 
     def sendControlerMode(self, mode):
-        if mode != self.controller_mode.data:
+         if mode != self.controller_mode.data:
             self.controller_mode.data = mode
             self.controllermode_pub.publish(self.controller_mode)
+            print("sent mode", mode)
 
     def run(self):
         while not rospy.is_shutdown():
@@ -72,10 +77,10 @@ class Master:
             
             vel = Twist()
             if self.state == 'going_box':
-                self.sendControlerMode('Coords')
+                self.sendControlerMode("Coords")
                 pose = Pose2D()
                 # coordinates of box
-                pose.x = 1 
+                pose.x = 2
                 pose.y = 1
                 pose.theta = 0
                 self.setpoint_pub.publish(pose)
@@ -92,18 +97,19 @@ class Master:
                 # Apago el controlador
                 self.sendControlerMode('Off')
                 # Me acerco al arUco
-                vel.linear.x = 0.1
+                vel.linear.x = 0.05
                 self.cmd_vel_pub.publish(vel)
-                rospy.sleep(1)
+                rospy.sleep(2)
                 # Comienzo a tomar el arUco
                 vel.linear.x = 0
                 self.cmd_vel_pub.publish(vel)
                 #TODO: Comienzo a publicar para que el servo lo agarre
-                self.servo_pub.publish(1) 
+                self.servo_pub.publish(-15) 
                 # Me hago hacia atras
-                vel.linear.x = -0.1
+                vel.linear.x = -0.05
+                vel.angular.z = -0.05
                 self.cmd_vel_pub.publish(vel)
-                rospy.sleep(1)
+                rospy.sleep(4)
                 # Me detengo
                 vel.linear.x = 0
                 self.cmd_vel_pub.publish(vel)
@@ -114,13 +120,13 @@ class Master:
                 self.sendControlerMode('Coords')
                 pose = Pose2D()
                 # coordinates of base
-                pose.x = 1 
-                pose.y = 1
+                pose.x = 2.7 
+                pose.y = 2.5
                 pose.theta = 0
                 self.setpoint_pub.publish(pose)
             elif self.state == 'searching_goal_ArUco':
                 self.sendControlerMode('Turning')
-                self.aruco = 3
+                self.aruco = 3 #! Numero dle aruco que se va a dejar
                 self.aruco_pub.publish(self.aruco)
                 if self.found == True:
                     self.state = 'reach_goal_ArUco'
@@ -132,7 +138,24 @@ class Master:
                 vel.angular.z = 0
                 print("Stopping motors")
                 self.cmd_vel_pub.publish(vel)
-                self.servo_pub.publish(1) 
+                self.servo_pub.publish(60)  
+                rospy.sleep(1)
+                vel.linear.x = -0.05
+                vel.angular.z = 0
+                self.cmd_vel_pub.publish(vel)
+                rospy.sleep(2)
+                vel.linear.x = 0
+                vel.angular.z = 0.1
+                self.cmd_vel_pub.publish(vel)
+                for _ in range(3):
+                    self.servo_pub.publish(-10)
+                    rospy.sleep(0.5)
+                    self.servo_pub.publish(60)
+                    rospy.sleep(0.5)
+
+
+
+
             print(self.state)
             # Sleep
             self.rate.sleep()
@@ -140,6 +163,7 @@ class Master:
 if __name__ == '__main__':
     try:
         mast = Master()
+        sleep(1)
         mast.run()
     except rospy.ROSInterruptException:
         mast.stop()

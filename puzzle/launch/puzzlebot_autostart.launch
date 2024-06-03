@@ -3,6 +3,8 @@
     <node name="rosserial" pkg="rosserial_python" type="serial_node.py">
         <param name="port" value="/dev/ttyUSBHacker"/>
     </node>
-    <node name="puzzlebot" pkg="puzzle" type="nodillo.py" output="screen"/>
-    <node name="puzzlebot" pkg="puzzle" type="nodillo_pro.py" output="screen"/>
+    <node name="loc" pkg="puzzle" type="localisation.py" />
+    <!-- <node name="lidar" pkg="puzzle" type="lidar.py" output="screen" /> -->
+    <node name="aruco" pkg="puzzle" type="arucoDetector.py"/>
+    <node name="ctrl" pkg="puzzle" type="controler.py" output="screen" />
 </launch>
